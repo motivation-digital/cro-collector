@@ -65,8 +65,7 @@ jobs:
           fi
           grep -q '"DB_SITES"' /tmp/cf-settings.json || { echo "::error::D1 DB_SITES binding missing"; exit 1; }
           grep -q '"GA4_API_SECRET"' /tmp/cf-settings.json || { echo "::error::Secrets Store GA4_API_SECRET binding missing"; exit 1; }
-          grep -q '"CONSENT"' /tmp/cf-settings.json || { echo "::error::Service CONSENT binding missing"; exit 1; }
-          echo "PASS: all critical bindings (DB_SITES, GA4_API_SECRET, CONSENT) preserved"
+          echo "PASS: all critical bindings (DB_SITES, GA4_API_SECRET) preserved"
 
       - name: Smoke test
         run: bash scripts/smoke-test.sh

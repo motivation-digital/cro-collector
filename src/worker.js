@@ -83,47 +83,31 @@ async function getBrandConfig(brand, env) {
 }
 
 /**
- * Check consent status via CONSENT service binding (TrustCentre / Zaraz)
+ * Check consent status — currently fail-safe (blocks all events pre-consent)
  *
- * Consent gate: analytics category must be accepted before sending to GA4.
- * Returns: true if allowed, false if pre-consent or denied.
+ * Wired to TrustCentre module (AGI-9000260) or Zaraz Consent bridge (AGI-9000074)
+ * when consent architecture is ready. For now, event acceptance is gated by:
+ * 1. A consent header passed in the request (e.g., X-Consent-Analytics: true)
+ * 2. Or a service binding call (added later)
+ *
+ * Returns: true if allowed, false if pre-consent or denied (fail-safe default: false)
  */
-async function checkConsent(visitorId, brand, env) {
-  if (!env.CONSENT) {
-    // CONSENT binding not configured — block all events (fail-safe pre-consent)
-    console.warn('[cro-collector] CONSENT binding missing; blocking event');
-    return false;
-  }
-
-  try {
-    // POST /consent-check → { allowed: bool }
-    // In future: call TrustCentre module or Zaraz
-    const resp = await env.CONSENT.fetch(
-      new Request('https://internal/consent-check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          visitor_id: visitorId,
-          brand,
-          category: 'analytics',
-        }),
-      })
+async function checkConsent(request, visitorId, brand) {
+  // Check for explicit consent header (testing/manual override)
+  // Format: X-Consent-Analytics: true
+  const consentHeader = request?.headers?.get('X-Consent-Analytics');
+  if (consentHeader === 'true') {
+    console.info(
+      `[cro-collector] Consent granted via header for ${visitorId} on ${brand}`
     );
-
-    if (!resp.ok) {
-      console.warn(
-        `[cro-collector] consent-check failed (HTTP ${resp.status}) for ${visitorId}`
-      );
-      return false;
-    }
-
-    const { allowed } = await resp.json();
-    return allowed === true;
-  } catch (err) {
-    console.error('[cro-collector] consent-check error:', err);
-    // Fail-safe: block if consent service is down
-    return false;
+    return true;
   }
+
+  // Fail-safe: block all events until consent module is wired
+  console.info(
+    `[cro-collector] Consent check: no analytics consent for ${visitorId} (module not yet wired)`
+  );
+  return false;
 }
 
 /**
@@ -255,7 +239,7 @@ export default {
         `visitor-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       // Check consent before sending
-      const allowed = await checkConsent(visitorId, brand, env);
+      const allowed = await checkConsent(request, visitorId, brand);
       if (!allowed) {
         // Pre-consent: acknowledge but don't send to GA4
         console.info(

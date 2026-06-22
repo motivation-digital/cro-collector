@@ -39,11 +39,11 @@ The stripe-payments worker has the CRO_COLLECTOR service binding configured and 
 | --- | --- | --- |
 | GA4_API_SECRET | GA4_API_SECRET | Google Analytics 4 Measurement Protocol API secret |
 
-## Service bindings
+## Consent gate (currently fail-safe, wired in future)
 
-| Binding | Service | Purpose |
-| --- | --- | --- |
-| CONSENT | consent-service | Check consent before sending event to GA4 |
+TrustCentre module (AGI-9000260) or Zaraz Consent bridge (AGI-9000074). For now:
+- Events are blocked by default (no consent module live)
+- Testing: pass `X-Consent-Analytics: true` header to override
 
 ## Rules (inline — full rules in lifecycle)
 

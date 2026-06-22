@@ -16,7 +16,5 @@ binding = "GA4_API_SECRET"
 secret_name = "GA4_API_SECRET"
 store_id = "170e0688af5f479292e0ab52c980eff7"
 
-# Consent module binding (TrustCentre preferred; Zaraz Consent as bridge)
-[[services]]
-binding = "CONSENT"
-service = "consent-service"
+# Consent gate: wired to TrustCentre module (AGI-9000260) or Zaraz Consent bridge (AGI-9000074)
+# Service binding added when TrustCentre/Zaraz is ready; currently fail-safe (no binding = block all)
