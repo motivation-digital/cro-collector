@@ -1,0 +1,15 @@
+{
+  "name": "cro-collector",
+  "version": "1.0.0",
+  "description": "GA4 Measurement Protocol server-side collector for CRO Framework",
+  "type": "module",
+  "main": "src/worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "smoke-test": "bash scripts/smoke-test.sh"
+  },
+  "devDependencies": {
+    "wrangler": "^3.60.0"
+  }
+}

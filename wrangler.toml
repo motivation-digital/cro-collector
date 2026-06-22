@@ -1,0 +1,22 @@
+name = "cro-collector"
+main = "src/worker.js"
+compatibility_date = "2026-06-01"
+account_id = "681f0c5e92719198aa9688776079097e"
+workers_dev = false
+
+# DB_SITES: multi-brand registry — brand → tenant lookup
+[[d1_databases]]
+binding = "DB_SITES"
+database_name = "sites"
+database_id = "80499765-3704-4c5d-ad25-ab88592fb075"
+
+# GA4 Measurement Protocol secret (API secret — NOT publishable key)
+[[secrets_store_secrets]]
+binding = "GA4_API_SECRET"
+secret_name = "GA4_API_SECRET"
+store_id = "170e0688af5f479292e0ab52c980eff7"
+
+# Consent module binding (TrustCentre preferred; Zaraz Consent as bridge)
+[[services]]
+binding = "CONSENT"
+service = "consent-service"
