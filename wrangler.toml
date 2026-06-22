@@ -2,7 +2,7 @@ name = "cro-collector"
 main = "src/worker.js"
 compatibility_date = "2026-06-01"
 account_id = "681f0c5e92719198aa9688776079097e"
-workers_dev = false
+workers_dev = true
 
 # DB_SITES: multi-brand registry — brand → tenant lookup
 [[d1_databases]]
