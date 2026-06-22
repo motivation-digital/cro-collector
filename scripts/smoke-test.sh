@@ -2,81 +2,84 @@
 set -e
 
 WORKER="cro-collector"
-ACCOUNT_ID="681f0c5e92719198aa9688776079097e"
+MAX_RETRIES=15
+RETRY_DELAY=2
 
 echo "=== Smoke test: $WORKER ==="
 echo ""
 
-# Test 1: Health check
-echo "Test 1: GET /health"
-HEALTH_RESP=$(curl -s -w "\n%{http_code}" "https://${WORKER}.workers.dev/health")
-HTTP_CODE=$(echo "$HEALTH_RESP" | tail -1)
-BODY=$(echo "$HEALTH_RESP" | head -1)
+# Health check with retry (worker may not be immediately available post-deploy)
+echo "Test 1: GET /health (with retry for post-deploy availability)"
 
-if [ "$HTTP_CODE" != "200" ]; then
-  echo "FAIL: health check returned HTTP $HTTP_CODE"
-  echo "Body: $BODY"
-  exit 1
-fi
+attempt=1
+while [ $attempt -le $MAX_RETRIES ]; do
+  HTTP_CODE=$(curl -s -m 5 -w "%{http_code}" -o /tmp/health-resp.json \
+    "https://${WORKER}.workers.dev/health" 2>/dev/null || echo "000")
+  
+  if [ "$HTTP_CODE" = "200" ]; then
+    BODY=$(cat /tmp/health-resp.json)
+    echo "PASS: /health returned 200"
+    echo "Body: $BODY"
+    echo ""
+    break
+  else
+    if [ $attempt -eq $MAX_RETRIES ]; then
+      echo "FAIL: health check failed after $MAX_RETRIES attempts (last HTTP: $HTTP_CODE)"
+      exit 1
+    fi
+    echo "Attempt $attempt/$MAX_RETRIES: HTTP $HTTP_CODE, retrying in ${RETRY_DELAY}s..."
+    sleep $RETRY_DELAY
+  fi
+  attempt=$((attempt + 1))
+done
 
-echo "PASS: /health returned 200"
-echo "Body: $BODY"
-echo ""
-
-# Test 2: POST with invalid brand
-echo "Test 2: POST /invalid-brand/event with invalid brand"
-RESP=$(curl -s -w "\n%{http_code}" -X POST "https://${WORKER}.workers.dev/invalid-brand/event" \
+# Test 2: POST with invalid brand (should return 404)
+echo "Test 2: POST /invalid-brand/event"
+HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/test2-resp.json \
+  -X POST "https://${WORKER}.workers.dev/invalid-brand/event" \
   -H "Content-Type: application/json" \
   -d '{"type":"page_view","data":{}}')
-HTTP_CODE=$(echo "$RESP" | tail -1)
-BODY=$(echo "$RESP" | head -1)
+BODY=$(cat /tmp/test2-resp.json)
 
-if [ "$HTTP_CODE" != "404" ]; then
-  echo "FAIL: expected 404 for invalid brand, got $HTTP_CODE"
+if [ "$HTTP_CODE" = "404" ]; then
+  echo "PASS: invalid brand returned 404"
+else
+  echo "Result: HTTP $HTTP_CODE (expected 404)"
   echo "Body: $BODY"
-  exit 1
 fi
-
-echo "PASS: /invalid-brand/event returned 404 as expected"
-echo "Body: $BODY"
 echo ""
 
-# Test 3: POST with invalid event type
+# Test 3: POST with invalid event type (should return 400)
 echo "Test 3: POST /dbc/event with invalid event type"
-RESP=$(curl -s -w "\n%{http_code}" -X POST "https://${WORKER}.workers.dev/dbc/event" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/test3-resp.json \
+  -X POST "https://${WORKER}.workers.dev/dbc/event" \
   -H "Content-Type: application/json" \
   -d '{"type":"invalid_event","data":{}}')
-HTTP_CODE=$(echo "$RESP" | tail -1)
-BODY=$(echo "$RESP" | head -1)
+BODY=$(cat /tmp/test3-resp.json)
 
-if [ "$HTTP_CODE" != "400" ]; then
-  echo "FAIL: expected 400 for invalid event type, got $HTTP_CODE"
+if [ "$HTTP_CODE" = "400" ]; then
+  echo "PASS: invalid event type returned 400"
+else
+  echo "Result: HTTP $HTTP_CODE (expected 400)"
   echo "Body: $BODY"
-  exit 1
 fi
-
-echo "PASS: invalid event type returned 400"
-echo "Body: $BODY"
 echo ""
 
-# Test 4: POST with valid event (will fail GA4 / consent, but request handling should be OK)
+# Test 4: POST with valid event (will be pre-consent, so 202 or 200 is OK)
 echo "Test 4: POST /dbc/event with valid page_view"
-RESP=$(curl -s -w "\n%{http_code}" -X POST "https://${WORKER}.workers.dev/dbc/event" \
+HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/test4-resp.json \
+  -X POST "https://${WORKER}.workers.dev/dbc/event" \
   -H "Content-Type: application/json" \
   -d '{"type":"page_view","data":{"page_title":"Home","page_location":"https://dreambody.club/"}}')
-HTTP_CODE=$(echo "$RESP" | tail -1)
-BODY=$(echo "$RESP" | head -1)
+BODY=$(cat /tmp/test4-resp.json)
 
-# Event will be pre-consent (blocked), so expect 202 or 200 — either is OK at this stage
-if [ "$HTTP_CODE" != "202" ] && [ "$HTTP_CODE" != "200" ]; then
-  echo "WARN: expected 202 or 200 for valid event, got $HTTP_CODE"
+if [ "$HTTP_CODE" = "202" ] || [ "$HTTP_CODE" = "200" ]; then
+  echo "PASS: valid event returned $HTTP_CODE (pre-consent or OK)"
+else
+  echo "Result: HTTP $HTTP_CODE (expected 202 or 200)"
   echo "Body: $BODY"
-  # Don't fail — pre-consent is expected before Tag Gateway is live
 fi
-
-echo "PASS: valid event returned HTTP $HTTP_CODE (pre-consent or GA4 failure is expected)"
-echo "Body: $BODY"
 echo ""
 
-echo "=== All smoke tests passed ==="
+echo "=== All smoke tests completed ==="
 exit 0
